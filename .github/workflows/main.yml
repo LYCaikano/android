@@ -1,0 +1,45 @@
+name: Build LineageOS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v3
+
+    - name: Set up environment
+      run: |
+        sudo apt update
+        sudo apt install -y openjdk-11-jdk git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc
+        mkdir -p ~/bin && curl -Lo ~/bin/repo https://storage.googleapis.com/git-repo-downloads/repo && chmod a+x ~/bin/repo
+        export PATH=~/bin:$PATH
+
+    - name: Initialize LineageOS repo
+      run: |
+        repo init -u https://github.com/LineageOS/android.git -b lineage-20.0
+        repo sync -c -j$(nproc) --no-clone-bundle --no-tags
+
+    - name: Clone device tree and dependencies
+      run: |
+        git clone https://github.com/LineageOS/android_device_xiaomi_lmi device/xiaomi/lmi
+        git clone https://github.com/LineageOS/android_kernel_xiaomi_sm8250 kernel/xiaomi/sm8250
+        git clone https://github.com/LineageOS/android_vendor_xiaomi_lmi vendor/xiaomi/lmi
+
+    - name: Build LineageOS
+      run: |
+        . build/envsetup.sh
+        lunch lineage_lmi-userdebug
+        mka bacon
+
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: lineageos
+        path: out/target/product/lmi/lineage-*.zip
