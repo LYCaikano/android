@@ -11,11 +11,9 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
-    # 1. 检出代码
     - name: Checkout source code
       uses: actions/checkout@v2
 
-    # 2. 设置构建环境
     - name: Set up dependencies
       run: |
         sudo dpkg --add-architecture i386
@@ -33,10 +31,9 @@ jobs:
           lib32stdc++6 \
           gcc-multilib \
           g++-multilib \
-          build-essential \
-          repo
+          build-essential
 
-    # 3. 安装 repo 工具（如果未预安装）
+    # 手动安装 repo
     - name: Install repo
       run: |
         mkdir -p ~/.bin
@@ -45,7 +42,6 @@ jobs:
         echo 'export PATH=~/.bin:$PATH' >> ~/.bashrc
         export PATH=~/.bin:$PATH
 
-    # 4. 初始化和同步 LineageOS 源码
     - name: Initialize LineageOS repo
       run: |
         mkdir -p ~/android/lineage
@@ -53,7 +49,6 @@ jobs:
         repo init -u https://github.com/LineageOS/android.git -b lineage-20.0
         repo sync --force-sync --no-clone-bundle --no-tags -j$(nproc)
 
-    # 5. 克隆设备相关的代码仓库（以 Redmi K30 Pro 为例）
     - name: Clone device-specific repos
       run: |
         cd ~/android/lineage
@@ -61,7 +56,6 @@ jobs:
         git clone https://github.com/LineageOS/android_kernel_xiaomi_lmi kernel/xiaomi/lmi
         git clone https://github.com/LineageOS/android_vendor_xiaomi_lmi vendor/xiaomi/lmi
 
-    # 6. 设置环境并开始构建
     - name: Build LineageOS
       run: |
         cd ~/android/lineage
@@ -69,7 +63,6 @@ jobs:
         lunch lineage_lmi-userdebug
         mka bacon
 
-    # 7. 保存输出文件
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
