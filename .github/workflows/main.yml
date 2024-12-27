@@ -11,35 +11,67 @@ jobs:
     runs-on: ubuntu-20.04
 
     steps:
+    # 1. 检出代码
     - name: Checkout source code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v2
 
-    - name: Set up environment
+    # 2. 设置构建环境
+    - name: Set up dependencies
       run: |
-        sudo apt update
-        sudo apt install -y openjdk-11-jdk git-core gnupg flex bison gperf build-essential zip curl zlib1g-dev gcc-multilib g++-multilib libc6-dev-i386 lib32ncurses5-dev x11proto-core-dev libx11-dev lib32z1-dev libgl1-mesa-dev libxml2-utils xsltproc unzip bc
-        mkdir -p ~/bin && curl -Lo ~/bin/repo https://storage.googleapis.com/git-repo-downloads/repo && chmod a+x ~/bin/repo
-        export PATH=~/bin:$PATH
+        sudo dpkg --add-architecture i386
+        sudo apt-get update
+        sudo apt-get install -y \
+          curl \
+          git \
+          openjdk-8-jdk \
+          python3 \
+          python3-pip \
+          unzip \
+          zip \
+          libncurses5-dev:i386 \
+          lib32z1 \
+          lib32stdc++6 \
+          gcc-multilib \
+          g++-multilib \
+          build-essential \
+          repo
 
+    # 3. 安装 repo 工具（如果未预安装）
+    - name: Install repo
+      run: |
+        mkdir -p ~/.bin
+        curl https://storage.googleapis.com/git-repo-downloads/repo > ~/.bin/repo
+        chmod a+rx ~/.bin/repo
+        echo 'export PATH=~/.bin:$PATH' >> ~/.bashrc
+        export PATH=~/.bin:$PATH
+
+    # 4. 初始化和同步 LineageOS 源码
     - name: Initialize LineageOS repo
       run: |
+        mkdir -p ~/android/lineage
+        cd ~/android/lineage
         repo init -u https://github.com/LineageOS/android.git -b lineage-20.0
-        repo sync -c -j$(nproc) --no-clone-bundle --no-tags
+        repo sync --force-sync --no-clone-bundle --no-tags -j$(nproc)
 
-    - name: Clone device tree and dependencies
+    # 5. 克隆设备相关的代码仓库（以 Redmi K30 Pro 为例）
+    - name: Clone device-specific repos
       run: |
+        cd ~/android/lineage
         git clone https://github.com/LineageOS/android_device_xiaomi_lmi device/xiaomi/lmi
-        git clone https://github.com/LineageOS/android_kernel_xiaomi_sm8250 kernel/xiaomi/sm8250
+        git clone https://github.com/LineageOS/android_kernel_xiaomi_lmi kernel/xiaomi/lmi
         git clone https://github.com/LineageOS/android_vendor_xiaomi_lmi vendor/xiaomi/lmi
 
+    # 6. 设置环境并开始构建
     - name: Build LineageOS
       run: |
-        . build/envsetup.sh
+        cd ~/android/lineage
+        source build/envsetup.sh
         lunch lineage_lmi-userdebug
         mka bacon
 
+    # 7. 保存输出文件
     - name: Upload build artifacts
       uses: actions/upload-artifact@v3
       with:
-        name: lineageos
-        path: out/target/product/lmi/lineage-*.zip
+        name: LineageOS
+        path: ~/android/lineage/out/target/product/lmi/*.zip
